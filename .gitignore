@@ -1,6 +1,6 @@
 venv/
 __pycache__/
 *.pyc
-*_characters_ign.txt
-words_alpha.txt
-.DS_Store
+*.txt
+!requirements.txt
+!words_alpha.txt
