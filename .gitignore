@@ -1,9 +1,21 @@
+# Secrets
 token.txt
-scans/
-proxies.txt
-__pycache__/
-*.pyc
-auth_cache.bin
 minecraft_token.json
 refresh_token.json
+auth_cache.bin
+
+# Data
+scans/
+blacklisted_words.txt
+Locked_IGNs.txt
+proxies.txt
+
+# Python
+__pycache__/
+*.pyc
 venv/
+.env
+
+# OS
+.DS_Store
+Thumbs.db

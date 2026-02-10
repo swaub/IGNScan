@@ -10,6 +10,10 @@ import concurrent.futures
 WORDLIST_URL = "https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt"
 WORDLIST_FILE = "words_alpha.txt"
 
+def clear_screen():
+    """Clears the terminal screen."""
+    os.system('cls' if os.name == 'nt' else 'clear')
+
 # URL for Common English Words (Top 10,000)
 COMMON_WORDS_URL = "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-no-swears.txt"
 COMMON_WORDS_FILE = "common_words.txt"
@@ -291,6 +295,8 @@ def check_name_status(name, bearer_token):
 
             if response.status_code == 200:
                 data = response.json()
+                # Hard throttle to protect account from rate limits when finding many names
+                time.sleep(8)
                 return data.get("status", "unknown")
             elif response.status_code == 401:
                 return "AUTH_EXPIRED"
@@ -447,84 +453,301 @@ def claim_name(name, token):
     return False
 
 def browse_and_claim(token):
-    """Menu to browse found names and claim them."""
-    print("\n--- Sniper Mode: Browse & Claim ---")
-    
-    found_names = []
-    
-    if not os.path.exists("scans"):
+    """Menu to browse found names by folder/file and claim them."""
+    base_dir = "scans"
+    if not os.path.exists(base_dir):
         print("No 'scans' folder found. Go find some names first!")
-        return
-
-    # Walk through all files in scans directory
-    for root, dirs, files in os.walk("scans"):
-        for file in files:
-            if file.endswith(".txt"):
-                path = os.path.join(root, file)
-                try:
-                    with open(path, "r", encoding="utf-8") as f:
-                        for line in f:
-                            if "[AVAILABLE]" in line:
-                                # Extract name "name [AVAILABLE]"
-                                parts = line.split(" [")
-                                if len(parts) >= 2:
-                                    name = parts[0].strip()
-                                    found_names.append((name, file, path))
-                except Exception:
-                    pass
-
-    if not found_names:
-        print("No [AVAILABLE] names found in your scan files yet.")
         input("Press Enter to return...")
         return
 
     while True:
-        print(f"\nFound {len(found_names)} available names:\n")
-        for i, (name, filename, path) in enumerate(found_names):
-            print(f"{i+1}. {name}  (from {filename})")
+        clear_screen()
+        print("\n--- Sniper Mode: Select Category ---")
         
-        print("\nType the number to CLAIM, or 'q' to go back.")
+        # Level 1: Folders (Character Lengths)
+        folders = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
+        folders.sort() # e.g. 3_characters, 4_characters
+        
+        if not folders:
+            print("No scan folders found.")
+            input("Press Enter to return...")
+            return
+
+        for i, folder in enumerate(folders):
+            print(f"{i+1}. {folder}")
+        
+        print("\nType number to select, or 'b' to go back to Main Menu.")
         choice = input("Choice: ").strip().lower()
         
-        if choice == 'q':
-            break
+        if choice == 'b': return
         
         try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(found_names):
-                target_name = found_names[idx][0]
-                target_path = found_names[idx][2]
+            folder_idx = int(choice) - 1
+            if 0 <= folder_idx < len(folders):
+                selected_folder = folders[folder_idx]
+                folder_path = os.path.join(base_dir, selected_folder)
                 
-                print(f"\nAre you sure you want to change your IGN to '{target_name}'?")
-                confirm = input("Type 'YES' to confirm: ").strip()
-                
-                if confirm == "YES":
-                    success = claim_name(target_name, token)
-                    if success:
-                        # Mark as TAKEN in the file so we don't try again
-                        try:
-                            with open(target_path, "r") as f:
-                                lines = f.readlines()
-                            with open(target_path, "w") as f:
-                                for line in lines:
-                                    if target_name in line and "[AVAILABLE]" in line:
-                                        f.write(line.replace("[AVAILABLE]", "[CLAIMED BY YOU]"))
+                # Level 2: Files (Scan Modes)
+                while True:
+                    clear_screen()
+                    print(f"\n--- Viewing: {selected_folder} ---")
+                    files = [f for f in os.listdir(folder_path) if f.endswith(".txt")]
+                    files.sort()
+                    
+                    if not files:
+                        print("No result files in this folder.")
+                        input("Press Enter to go back...")
+                        break
+
+                    for i, f in enumerate(files):
+                        print(f"{i+1}. {f}")
+                    
+                    print("\nType number to select file, or 'b' to go back.")
+                    file_choice = input("Choice: ").strip().lower()
+                    
+                    if file_choice == 'b': break
+                    
+                    try:
+                        file_idx = int(file_choice) - 1
+                        if 0 <= file_idx < len(files):
+                            selected_file = files[file_idx]
+                            file_path = os.path.join(folder_path, selected_file)
+                            
+                            # Level 3: Names
+                            while True:
+                                clear_screen()
+                                print(f"\n--- Available Names in {selected_file} ---")
+                                available_names = []
+                                try:
+                                    with open(file_path, "r", encoding="utf-8") as f:
+                                        for line in f:
+                                            if "[AVAILABLE]" in line:
+                                                name = line.split(" [")[0].strip()
+                                                available_names.append(name)
+                                except: pass
+                                
+                                if not available_names:
+                                    print("No [AVAILABLE] names found in this file.")
+                                    print("(Or they have already been claimed/marked taken)")
+                                else:
+                                    for i, name in enumerate(available_names):
+                                        print(f"{i+1}. {name}")
+                                
+                                print("\nType number to CLAIM, or 'b' to go back.")
+                                name_choice = input("Choice: ").strip().lower()
+                                
+                                if name_choice == 'b': break
+                                
+                                try:
+                                    name_idx = int(name_choice) - 1
+                                    if 0 <= name_idx < len(available_names):
+                                        target_name = available_names[name_idx]
+                                        print(f"\nAre you sure you want to change your IGN to '{target_name}'?")
+                                        confirm = input("Type 'YES' to confirm: ").strip()
+                                        
+                                        if confirm == "YES":
+                                            if claim_name(target_name, token):
+                                                # Mark as claimed in file
+                                                try:
+                                                    with open(file_path, "r") as f: lines = f.readlines()
+                                                    with open(file_path, "w") as f:
+                                                        for line in lines:
+                                                            if target_name in line:
+                                                                f.write(line.replace("[AVAILABLE]", "[CLAIMED BY YOU]"))
+                                                            else:
+                                                                f.write(line)
+                                                except: pass
+                                                input("\nPress Enter to continue...")
+                                        else:
+                                            print("Cancelled.")
+                                            time.sleep(1)
                                     else:
-                                        f.write(line)
-                            print(f"Updated record in {target_path}")
-                            # Remove from list in memory
-                            found_names.pop(idx)
-                        except:
-                            pass
-                        
-                        input("\nPress Enter to continue...")
-                else:
-                    print("Cancelled.")
+                                        print("Invalid number.")
+                                        time.sleep(1)
+                                except ValueError:
+                                    print("Invalid input.")
+                                    time.sleep(1)
+                        else:
+                            print("Invalid file number.")
+                            time.sleep(1)
+                    except ValueError:
+                        print("Invalid input.")
+                        time.sleep(1)
             else:
-                print("Invalid number.")
+                print("Invalid folder number.")
+                time.sleep(1)
         except ValueError:
             print("Invalid input.")
+            time.sleep(1)
 
+
+def delete_results():
+    """Hierarchical menu to delete scan results."""
+    base_dir = "scans"
+    if not os.path.exists(base_dir):
+        print("No 'scans' folder found.")
+        input("Press Enter to return...")
+        return
+
+    while True:
+        clear_screen()
+        print("\n--- Delete Results: Select Folder ---")
+        folders = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
+        folders.sort()
+        
+        if not folders:
+            print("No folders found.")
+            input("Press Enter to return...")
+            return
+
+        for i, folder in enumerate(folders):
+            print(f"{i+1}. {folder}")
+        
+        print("\nType number to select, 'ALL' to delete everything, or 'b' to go back.")
+        choice = input("Choice: ").strip().lower()
+        
+        if choice == 'b': return
+        if choice == 'all':
+            confirm = input("ARE YOU SURE? This wipes ALL scan results. (Type 'DELETE ALL'): ")
+            if confirm == "DELETE ALL":
+                import shutil
+                shutil.rmtree(base_dir)
+                os.makedirs(base_dir)
+                print("Everything wiped.")
+                time.sleep(1)
+                return
+            continue
+
+        try:
+            folder_idx = int(choice) - 1
+            if 0 <= folder_idx < len(folders):
+                selected_folder = folders[folder_idx]
+                folder_path = os.path.join(base_dir, selected_folder)
+                
+                while True:
+                    clear_screen()
+                    print(f"\n--- Delete from: {selected_folder} ---")
+                    files = [f for f in os.listdir(folder_path) if f.endswith(".txt")]
+                    files.sort()
+                    
+                    if not files:
+                        print("Folder is empty.")
+                        input("Press Enter to go back...")
+                        break
+
+                    for i, f in enumerate(files):
+                        print(f"{i+1}. {f}")
+                    
+                    print("\nType number to DELETE file, 'FOLDER' to delete entire folder, or 'b' to go back.")
+                    file_choice = input("Choice: ").strip().lower()
+                    
+                    if file_choice == 'b': break
+                    if file_choice == 'folder':
+                        confirm = input(f"Confirm deleting folder '{selected_folder}'? (y/n): ").lower()
+                        if confirm == 'y':
+                            import shutil
+                            shutil.rmtree(folder_path)
+                            print("Folder deleted.")
+                            time.sleep(1)
+                            break
+                        continue
+
+                    try:
+                        file_idx = int(file_choice) - 1
+                        if 0 <= file_idx < len(files):
+                            target_file = files[file_idx]
+                            file_path = os.path.join(folder_path, target_file)
+                            confirm = input(f"Delete '{target_file}'? (y/n): ").lower()
+                            if confirm == 'y':
+                                os.remove(file_path)
+                                print("File deleted.")
+                                time.sleep(1)
+                        else:
+                            print("Invalid file number.")
+                            time.sleep(1)
+                    except ValueError:
+                        print("Invalid input.")
+                        time.sleep(1)
+            else:
+                print("Invalid folder number.")
+                time.sleep(1)
+        except ValueError:
+            print("Invalid input.")
+            time.sleep(1)
+
+def filter_results():
+    """Analyzes found names to find real words and 'leet' words."""
+    base_dir = "scans"
+    if not os.path.exists(base_dir):
+        print("No scans found.")
+        input("Press Enter...")
+        return
+
+    # Load dictionary for checking
+    print("Loading dictionary for analysis...")
+    vocab = set()
+    if os.path.exists(WORDLIST_FILE):
+        with open(WORDLIST_FILE, "r") as f:
+            for line in f:
+                vocab.add(line.strip().lower())
+    else:
+        print("Dictionary file missing. Cannot filter.")
+        return
+
+    # Leet map
+    # 0->o, 1->i, 3->e, 4->a, 5->s, 7->t
+    leet_map = str.maketrans("013457", "oieast")
+
+    clean_words = []
+    leet_words = []
+    
+    # Collect all AVAILABLE names
+    total_found = 0
+    for root, dirs, files in os.walk(base_dir):
+        for file in files:
+            if file.endswith(".txt"):
+                path = os.path.join(root, file)
+                try:
+                    with open(path, "r") as f:
+                        for line in f:
+                            if "[AVAILABLE]" in line:
+                                name = line.split(" [")[0].strip().lower()
+                                total_found += 1
+                                
+                                # Check 1: Is it a clean word?
+                                if name in vocab:
+                                    clean_words.append(name)
+                                    continue
+                                
+                                # Check 2: Is it a leet word?
+                                de_leeted = name.translate(leet_map)
+                                if de_leeted != name and de_leeted in vocab:
+                                    leet_words.append(f"{name} ({de_leeted})")
+                except: pass
+
+    clear_screen()
+    print(f"--- Analysis Complete (Scanned {total_found} names) ---")
+    print(f"Found {len(clean_words)} Clean Dictionary Words.")
+    print(f"Found {len(leet_words)} Leet-Speak Words.\n")
+    
+    if clean_words:
+        print("--- CLEAN WORDS ---")
+        for i in range(0, len(clean_words), 25):
+            chunk = clean_words[i:i+25]
+            print(", ".join(chunk))
+            if i + 25 < len(clean_words):
+                input("\nPress Enter for more...")
+        print("\n")
+
+    if leet_words:
+        print("--- LEET WORDS ---")
+        for i in range(0, len(leet_words), 25):
+            chunk = leet_words[i:i+25]
+            print(", ".join(chunk))
+            if i + 25 < len(leet_words):
+                input("\nPress Enter for more...")
+    
+    input("\nPress Enter to return to menu...")
 
 def main():
     print("--- Minecraft IGN Scanner ---")
@@ -536,26 +759,41 @@ def main():
         print("Authentication failed. Exiting.")
         return
 
+    # Outer loop to return to Main Menu after scanning
     while True:
+        clear_screen()
         print("\n=== Main Menu ===")
         print("1. Start Scanner")
         print("2. Sniper Mode (Browse & Claim)")
-        print("3. Exit")
+        print("3. Clear Results")
+        print("4. Filter & Organize Results")
+        print("5. Exit")
         
         main_choice = input("Choice: ").strip()
         
-        if main_choice == "3":
+        if main_choice == "5":
             print("Goodbye!")
             return
+        elif main_choice == "4":
+            filter_results()
+            continue
+        elif main_choice == "3":
+            delete_results()
+            continue
         elif main_choice == "2":
             browse_and_claim(bearer_token)
             continue
         elif main_choice == "1":
-            break # Proceed to scanner setup
+            # Proceed to scanner setup
+            break 
         else:
             print("Invalid choice.")
+            time.sleep(1)
+            continue
 
-    # 1. Input Length
+        # --- Scanner Setup (Option 1) ---
+        clear_screen()
+        # 1. Input Length
     while True:
         try:
             char_limit_input = input("\nEnter character limit (3-16): ")
@@ -664,6 +902,16 @@ def main():
         print("Error accessing file.")
         return
 
+    clear_screen()
+    print("--- Scan Configuration ---")
+    print(f"Target Length: {char_limit} characters")
+    print(f"Mode: {mode.replace('_', ' ').title()}")
+    count_display = "Infinite" if target_count == float('inf') else target_count
+    if mode != "random":
+        count_display = f"{len(word_list)} remaining words"
+    print(f"Target Count: {count_display}")
+    print(f"Saving to: {filename}")
+    print("--------------------------")
     print("\nStarting scan... (Press Ctrl+C to stop)\n")
 
     # Pre-load stats from existing data
@@ -681,9 +929,16 @@ def main():
 
     def update_display(final=False):
         scanned = total_available + total_unavailable + total_not_allowed + total_locked + total_unverified
+        
+        # Calculate remaining
+        if mode == "random":
+            remaining = "Infinite"
+        else:
+            remaining = len(word_list)
+
         line = (f"Scanned: {scanned} | Available: {total_available}"
                 f" | Taken: {total_unavailable} | Locked: {total_locked}"
-                f" | Blocked: {total_not_allowed} | Unverified: {total_unverified}")
+                f" | Blocked: {total_not_allowed} | Remaining: {remaining}")
         
         # \r to return to start, \x1b[2K to clear the line
         sys.stdout.write(f"\r\x1b[2K{line}")
@@ -694,166 +949,179 @@ def main():
     try:
         processed_count = 0
         while processed_count < target_count:
-            # Determine batch size
-            current_batch_size = batch_size
-            if target_count != float('inf'):
-                remaining = int(target_count - processed_count)
-                if remaining < batch_size:
-                    current_batch_size = remaining
+            try:
+                # Determine batch size
+                current_batch_size = batch_size
+                if target_count != float('inf'):
+                    remaining = int(target_count - processed_count)
+                    if remaining < batch_size:
+                        current_batch_size = remaining
 
-            if current_batch_size <= 0:
-                break
+                if current_batch_size <= 0:
+                    break
 
-            # Generate Names
-            batch_names = set()
-            attempts = 0
-            max_attempts = current_batch_size * 100 
+                # Generate Names
+                batch_names = set()
+                attempts = 0
+                max_attempts = current_batch_size * 100 
 
-            while len(batch_names) < current_batch_size:
-                name = ""
-                if mode in ["dictionary", "common_words"]:
-                     if not word_list:
-                         break
-                     # Take the last word from the shuffled list
-                     name = word_list.pop()
-                else:
-                    name = generate_random_name(char_limit)
+                while len(batch_names) < current_batch_size:
+                    name = ""
+                    if mode in ["dictionary", "common_words"]:
+                         if not word_list:
+                             break
+                         # Take the last word from the shuffled list
+                         name = word_list.pop()
+                    else:
+                        name = generate_random_name(char_limit)
 
-                if name.lower() in blacklisted_names:
-                    # For dictionary mode, if it's blacklisted, it's already popped. 
-                    # We just move to the next.
+                    if name.lower() in blacklisted_names:
+                        # For dictionary mode, if it's blacklisted, it's already popped. 
+                        # We just move to the next.
+                        attempts += 1
+                        if attempts > max_attempts: break
+                        continue
+
+                    batch_names.add(name)
                     attempts += 1
                     if attempts > max_attempts: break
-                    continue
 
-                batch_names.add(name)
-                attempts += 1
-                if attempts > max_attempts: break
+                if not batch_names:
+                    print("\nCould not generate more unique names.")
+                    break
 
-            if not batch_names:
-                print("\nCould not generate more unique names.")
-                break
+                batch_list = list(batch_names)
+                processed_count += len(batch_list)
 
-            batch_list = list(batch_names)
-            processed_count += len(batch_list)
+                # Stage 1: Bulk check (unauthenticated)
+                taken_names_set, failed_names_set = check_names_bulk(batch_list)
 
-            # Stage 1: Bulk check (unauthenticated)
-            taken_names_set, failed_names_set = check_names_bulk(batch_list)
+                candidates = []
+                for name in batch_list:
+                    if name in failed_names_set:
+                        candidates.append(name)
+                        continue
 
-            candidates = []
-            for name in batch_list:
-                if name in failed_names_set:
-                    candidates.append(name)
-                    continue
+                    is_taken = False
+                    for taken in taken_names_set:
+                        if taken.lower() == name.lower():
+                            total_unavailable += 1
+                            is_taken = True
+                            break
 
-                is_taken = False
-                for taken in taken_names_set:
-                    if taken.lower() == name.lower():
-                        total_unavailable += 1
-                        is_taken = True
-                        break
+                    if not is_taken:
+                        candidates.append(name)
+                    else:
+                        update_display()
 
-                if not is_taken:
-                    candidates.append(name)
-                else:
-                    update_display()
-
-            # Stage 2: Unauthenticated individual verify (Multi-threaded)
-            stage2_candidates = []
-            
-            # Helper for threading
-            def verify_wrapper(name):
-                res = verify_name(name)
-                return name, res
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-                # Submit all candidates
-                future_to_name = {executor.submit(verify_wrapper, n): n for n in candidates}
+                # Stage 2: Unauthenticated individual verify (Multi-threaded)
+                stage2_candidates = []
                 
-                # Process as they complete
-                for future in concurrent.futures.as_completed(future_to_name):
-                    name, result = future.result()
-                    if result == "available":
-                        stage2_candidates.append(name)
-                    elif result == "taken":
-                        total_unavailable += 1
-                    else:
-                        total_unverified += 1
-                    
-                    update_display()
-                    # Small sleep per completion to keep UI smooth, not strictly necessary for logic
-                    # time.sleep(0.05) 
+                # Helper for threading
+                def verify_wrapper(name):
+                    res = verify_name(name)
+                    return name, res
 
-            # Stage 3: Authenticated status check
-            if auth_valid:
-                for name in stage2_candidates:
-                    status = check_name_status(name, bearer_token)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                    # Submit all candidates
+                    future_to_name = {executor.submit(verify_wrapper, n): n for n in candidates}
                     
-                    res_status = ""
-                    if status == "AVAILABLE":
-                        total_available += 1
-                        res_status = "AVAILABLE"
+                    # Process as they complete
+                    for future in concurrent.futures.as_completed(future_to_name):
+                        name, result = future.result()
+                        if result == "available":
+                            stage2_candidates.append(name)
+                        elif result == "taken":
+                            total_unavailable += 1
+                        else:
+                            total_unverified += 1
                         
-                        if name.lower() in locked_names:
-                            remove_from_locked_list(name, locked_names)
-                            
-                    elif status == "TAKEN":
-                        total_unavailable += 1
-                        if name.lower() in locked_names:
-                            remove_from_locked_list(name, locked_names)
+                        update_display()
 
-                    elif status == "NOT_ALLOWED":
-                        total_not_allowed += 1
-                        if name.lower() not in blacklisted_names:
-                            blacklisted_names.add(name.lower())
-                            append_to_blacklist(name)
+                # Stage 3: Authenticated status check
+                if auth_valid:
+                    for name in stage2_candidates:
+                        status = check_name_status(name, bearer_token)
+                        
+                        res_status = ""
+                        if status == "AVAILABLE":
+                            total_available += 1
+                            res_status = "AVAILABLE"
                             
-                    elif status == "DUPLICATE":
-                        total_locked += 1
-                        # Do NOT write to scan file (res_status left empty)
-                        # Only add to the master Locked_IGNs.txt list
-                        if name.lower() not in locked_names:
-                            locked_names.add(name.lower())
-                            append_to_locked_list(name)
-                            
-                    elif status == "AUTH_EXPIRED":
-                        sys.stdout.write("\n")
-                        print("Bearer token expired!")
-                        auth_valid = False
-                        total_unverified += 1
-                    else:
-                        total_unverified += 1
+                            if name.lower() in locked_names:
+                                remove_from_locked_list(name, locked_names)
+                                
+                        elif status == "TAKEN":
+                            total_unavailable += 1
+                            if name.lower() in locked_names:
+                                remove_from_locked_list(name, locked_names)
 
-                    if res_status:
-                        try:
-                            with open(filename, "a") as f:
-                                f.write(f"{name} [{res_status}]\n")
-                        except IOError: pass
+                        elif status == "NOT_ALLOWED":
+                            total_not_allowed += 1
+                            if name.lower() not in blacklisted_names:
+                                blacklisted_names.add(name.lower())
+                                append_to_blacklist(name)
+                                
+                        elif status == "DUPLICATE":
+                            total_locked += 1
+                            # Do NOT write to scan file (res_status left empty)
+                            # Only add to the master Locked_IGNs.txt list
+                            if name.lower() not in locked_names:
+                                locked_names.add(name.lower())
+                                append_to_locked_list(name)
+                                
+                        elif status == "AUTH_EXPIRED":
+                            sys.stdout.write("\n")
+                            print("Bearer token expired!")
+                            auth_valid = False
+                            total_unverified += 1
+                        else:
+                            total_unverified += 1
 
+                        if res_status:
+                            try:
+                                with open(filename, "a") as f:
+                                    f.write(f"{name} [{res_status}]\n")
+                            except IOError: pass
+
+                        update_display()
+                        time.sleep(0.5)
+
+                # Cooling down logic
+                names_since_pause += len(batch_list)
+                if names_since_pause >= 50:
+                    # Clear line and print cooling message
+                    sys.stdout.write(f"\r\x1b[2KScanned: {total_available+total_unavailable+total_not_allowed+total_locked+total_unverified} ... [PAUSED] Cooling down 3s...")
+                    sys.stdout.flush()
+                    time.sleep(3)
                     update_display()
-                    time.sleep(0.5)
+                    names_since_pause = 0
 
-            # Cooling down logic
-            names_since_pause += len(batch_list)
-            if names_since_pause >= 50:
-                # Clear line and print cooling message
-                sys.stdout.write(f"\r\x1b[2KScanned: {total_available+total_unavailable+total_not_allowed+total_locked+total_unverified} ... [PAUSED] Cooling down 3s...")
-                sys.stdout.flush()
-                time.sleep(3)
-                update_display()
-                names_since_pause = 0
+            except KeyboardInterrupt:
+                # Pause and ask
+                sys.stdout.write("\n\n[PAUSED] Scan interrupted.\n")
+                choice = input("Quit to Main Menu? (y/n): ").strip().lower()
+                if choice == 'y':
+                    break
+                else:
+                    print("Resuming scan...")
+                    update_display()
+                    continue
 
     except KeyboardInterrupt:
         print("\n\nScan stopped by user.")
 
+    # Final Summary before returning to menu
     update_display(final=True)
+    print("\nProcess finished.")
     print(f"Total processed: {total_available+total_unavailable+total_not_allowed+total_locked+total_unverified}")
     print(f"Available: {total_available}")
     print(f"Taken: {total_unavailable}")
-    print(f"Locked (not claimable): {total_locked}")
+    print(f"Locked (recorded): {total_locked}")
     print(f"Blocked by filter: {total_not_allowed}")
     print(f"Could not verify: {total_unverified}")
     print(f"Results saved to {filename}")
+    input("\nPress Enter to return to the Main Menu...")
 
 if __name__ == "__main__":
     main()
