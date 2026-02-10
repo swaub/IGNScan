@@ -65,7 +65,7 @@ When starting a scan, you will choose a generation mode:
 
 ### Proxies (Optional)
 To scan faster or run multiple instances, you can use proxies.
-1.  Create a file named `proxies.txt` in the folder.
+1.  Create a file named `proxies.txt` in the folder (or rename `proxies_template.txt`).
 2.  Add one proxy per line. Supported formats:
     *   `ip:port`
     *   `user:pass@ip:port`
