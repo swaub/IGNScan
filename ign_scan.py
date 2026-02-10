@@ -312,13 +312,21 @@ def check_name_status(name, bearer_token):
     return "unknown"
 
 def prompt_bearer_token():
+
     """Prompts the user for a Minecraft bearer token."""
+
     print("\n--- Authentication Required ---")
+
     print("Please enter your Minecraft Bearer Token.")
+
     print("(See SETUP.md for instructions on how to get this token.)")
+
     print("-------------------------------------")
 
+
+
     while True:
+
         if os.path.exists("token.txt"):
 
             with open("token.txt", "r") as f:
@@ -331,89 +339,73 @@ def prompt_bearer_token():
 
             token = input("Paste Bearer Token: ").strip()
 
-        
+
 
         # Cleanup
 
-        if token.lower().startswith("bearer "): token = token[7:].strip()
+        if token.lower().startswith("bearer "):
 
-        if token.startswith('"') or token.startswith("'"): token = token[1:-1]
+            token = token[7:].strip()
 
-        
+        if token.startswith('"') or token.startswith("'"):
+
+            token = token[1:-1]
+
+
 
         if not token:
 
-            if os.path.exists("token.txt"): os.remove("token.txt")
+            if os.path.exists("token.txt"):
+
+                os.remove("token.txt")
 
             continue
 
-            
 
-                # Validate
 
-            
+        # Validate token
 
-                print("Validating token...")
+        print("Validating token...")
 
-            
+        status = check_name_status("Notch", token)
 
-                status = check_name_status("Notch", token)
+        if status in ["TAKEN", "DUPLICATE", "AVAILABLE", "NOT_ALLOWED"]:
 
-            
-
-                if status in ["TAKEN", "DUPLICATE", "AVAILABLE", "NOT_ALLOWED"]:
+            print(f"Token accepted! (Status: {status})")
 
             
 
-                    print(f"Token accepted! (Status: {status})")
+            # Save the token for future use
+
+            try:
+
+                with open("token.txt", "w", encoding="utf-8") as f:
+
+                    f.write(token)
+
+                print("Token saved to token.txt")
+
+            except:
+
+                pass
 
             
 
-                    
+            return token
 
-            
-
-                    # Save the token for future use
-
-            
-
-                    try:
-
-            
-
-                        with open("token.txt", "w", encoding="utf-8") as f:
-
-            
-
-                            f.write(token)
-
-            
-
-                        print("Token saved to token.txt")
-
-            
-
-                    except: pass
-
-            
-
-                    
-
-            
-
-                    return token
-
-            
-
-                else:
+        else:
 
             print(f"Invalid token (Status: {status}). Please get a fresh one.")
 
-            if os.path.exists("token.txt"): os.remove("token.txt")
+            if os.path.exists("token.txt"):
+
+                os.remove("token.txt")
 
             retry = input("Try again? (y/n): ").lower()
 
-            if retry != 'y': return None
+            if retry != 'y':
+
+                return None
 
 def claim_name(name, token):
     """Attempts to change the Minecraft username to the target name."""
