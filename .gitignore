@@ -1,6 +1,9 @@
-venv/
+token.txt
+scans/
+proxies.txt
 __pycache__/
 *.pyc
-*.txt
-!requirements.txt
-!words_alpha.txt
+auth_cache.bin
+minecraft_token.json
+refresh_token.json
+venv/

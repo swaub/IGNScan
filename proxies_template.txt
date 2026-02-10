@@ -1,0 +1,5 @@
+# Add your proxies here, one per line.
+# Formats supported:
+# 127.0.0.1:8080
+# user:password@127.0.0.1:8080
+# socks5://127.0.0.1:1080
