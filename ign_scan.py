@@ -349,19 +349,63 @@ def prompt_bearer_token():
 
             
 
-        # Validate
+                # Validate
 
-        print("Validating token...")
+            
 
-        status = check_name_status("Notch", token)
+                print("Validating token...")
 
-        if status in ["TAKEN", "DUPLICATE", "AVAILABLE", "NOT_ALLOWED"]:
+            
 
-            print(f"Token accepted! (Status: {status})")
+                status = check_name_status("Notch", token)
 
-            return token
+            
 
-        else:
+                if status in ["TAKEN", "DUPLICATE", "AVAILABLE", "NOT_ALLOWED"]:
+
+            
+
+                    print(f"Token accepted! (Status: {status})")
+
+            
+
+                    
+
+            
+
+                    # Save the token for future use
+
+            
+
+                    try:
+
+            
+
+                        with open("token.txt", "w", encoding="utf-8") as f:
+
+            
+
+                            f.write(token)
+
+            
+
+                        print("Token saved to token.txt")
+
+            
+
+                    except: pass
+
+            
+
+                    
+
+            
+
+                    return token
+
+            
+
+                else:
 
             print(f"Invalid token (Status: {status}). Please get a fresh one.")
 
