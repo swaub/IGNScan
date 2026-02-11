@@ -1382,6 +1382,9 @@ def main():
         error("Authentication failed. Exiting.")
         return
 
+    # Ensure scans folder exists
+    os.makedirs("scans", exist_ok=True)
+
     while True:
         clear_screen()
         header("IGN SCANNER")
