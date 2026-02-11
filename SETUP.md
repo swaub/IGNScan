@@ -8,15 +8,16 @@
 
 ### Setup
 1.  Open a terminal in the project folder.
-2.  (Optional but recommended) Create a virtual environment:
+2.  Create a virtual environment:
     ```bash
     python -m venv venv
     source venv/bin/activate  # On Linux/Mac
-    venv\Scripts\activate     # On Windows
+    venv\Scripts\activate     # On Windows (CMD)
+    venv\Scripts\Activate.ps1 # On Windows (PowerShell)
     ```
 3.  Install dependencies:
     ```bash
-    pip install requests requests[socks]
+    pip install -r requirements.txt
     ```
 
 ---
