@@ -15,6 +15,11 @@
     venv\Scripts\activate     # On Windows (CMD)
     venv\Scripts\Activate.ps1 # On Windows (PowerShell)
     ```
+    **PowerShell users:** If you get a "running scripts is disabled" error, run this first:
+    ```powershell
+    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+    ```
+    Then try the activate command again.
 3.  Install dependencies:
     ```bash
     pip install -r requirements.txt
