@@ -263,7 +263,7 @@ def _poll_browser_for_token(driver):
         remaining = max(0, int(deadline - time.time()))
         mins, secs = divmod(remaining, 60)
         dots = "." * ((poll_count % 3) + 1)
-        sys.stdout.write(f"\r\x1b[2K  {YELLOW}[*]{RESET} Waiting for sign-in{dots: <4} {DIM}({mins}:{secs:02d} remaining){RESET}")
+        sys.stdout.write(f"\r  [*] Waiting for sign-in{dots: <4} ({mins}:{secs:02d} remaining)   ")
         sys.stdout.flush()
         poll_count += 1
 
@@ -282,13 +282,13 @@ def _poll_browser_for_token(driver):
                         token = headers["Authorization"]
                         if token.lower().startswith("bearer "):
                             token = token[7:]
-                        sys.stdout.write("\r\x1b[2K")
+                        sys.stdout.write("\r" + " " * 60 + "\r")
                         sys.stdout.flush()
                         return token
             except (KeyError, json.JSONDecodeError):
                 continue
 
-    sys.stdout.write("\r\x1b[2K")
+    sys.stdout.write("\r" + " " * 60 + "\r")
     sys.stdout.flush()
     return None
 
@@ -343,7 +343,7 @@ def grab_token_from_browser():
         return None
 
     except KeyboardInterrupt:
-        sys.stdout.write("\r\x1b[2K")
+        sys.stdout.write("\r" + " " * 60 + "\r")
         sys.stdout.flush()
         warn("Browser sign-in cancelled.")
         return None
@@ -382,7 +382,7 @@ def grab_token_from_browser():
             return None
 
         except KeyboardInterrupt:
-            sys.stdout.write("\r\x1b[2K")
+            sys.stdout.write("\r" + " " * 60 + "\r")
             sys.stdout.flush()
             warn("Browser sign-in cancelled.")
             return None
@@ -1132,40 +1132,33 @@ def run_scanner(bearer_token):
             pct = min(100, int(done / total_words * 100))
             bar_width = 15
             filled = int(bar_width * done / total_words)
-            bar = f"{GREEN}{'█' * filled}{DIM}{'░' * (bar_width - filled)}{RESET}"
+            bar = f"{'#' * filled}{'-' * (bar_width - filled)}"
             if speed > 0 and len(word_list) > 0:
                 eta_seconds = len(word_list) / (speed / 60)
-                eta_str = f" {DIM}ETA: {format_duration(eta_seconds)}{RESET}"
+                eta_str = f" ETA: {format_duration(eta_seconds)}"
             else:
                 eta_str = ""
-            progress_str = f" {bar} {pct}%{eta_str}"
+            progress_str = f" [{bar}] {pct}%{eta_str}"
         else:
             progress_str = ""
 
-        # Line 1: Stats
-        line1 = (
-            f"  Scanned: {BOLD}{scanned}{RESET}"
-            f" {DIM}|{RESET} {GREEN}Available: {total_available}{RESET}"
-            f" {DIM}|{RESET} {RED}Taken: {total_unavailable}{RESET}"
-            f" {DIM}|{RESET} {YELLOW}Locked: {total_locked}{RESET}"
-            f" {DIM}|{RESET} Blocked: {total_not_allowed}"
+        line = (
+            f"  Scanned: {scanned}"
+            f" | Avail: {total_available}"
+            f" | Taken: {total_unavailable}"
+            f" | Locked: {total_locked}"
+            f" | Blocked: {total_not_allowed}"
+            f" | {elapsed_str} @ {speed:.1f}/min"
+            f" | Rem: {rem_str}"
+            f"{progress_str}"
         )
-        # Line 2: Timing & progress
-        line2 = (
-            f"  {DIM}Elapsed: {elapsed_str}"
-            f" | Speed: {speed:.1f}/min"
-            f" | Rem: {rem_str}{RESET}"
-            f" {progress_str}"
-        )
-        # Move up one line, clear both lines, rewrite
-        sys.stdout.write(f"\x1b[A\r\x1b[2K{line1}\n\r\x1b[2K{line2}")
+        # Pad with spaces to overwrite any leftover characters
+        terminal_width = shutil.get_terminal_size((120, 24)).columns
+        padded = line.ljust(terminal_width - 1)
+        sys.stdout.write(f"\r{padded}")
         if final:
             sys.stdout.write("\n")
         sys.stdout.flush()
-
-    # Print two blank lines for the two-line status display
-    print()
-    print()
 
     try:
         processed_count = 0
@@ -1260,8 +1253,7 @@ def run_scanner(bearer_token):
                             total_available += 1
                             res_status = "AVAILABLE"
                             found_names.append(name)
-                            sys.stdout.write(f"\r\x1b[2K  {GREEN}{BOLD}>> FOUND: {name}{RESET}\n")
-                            sys.stdout.flush()
+                            print(f"\n  >> FOUND: {name}")
                             if name.lower() in locked_names:
                                 remove_from_locked_list(name, locked_names)
                         elif status == "TAKEN":
@@ -1297,8 +1289,7 @@ def run_scanner(bearer_token):
                                     total_available += 1
                                     res_status = "AVAILABLE"
                                     found_names.append(name)
-                                    sys.stdout.write(f"\r\x1b[2K  {GREEN}{BOLD}>> FOUND: {name}{RESET}\n")
-                                    sys.stdout.flush()
+                                    print(f"\n  >> FOUND: {name}")
                                 elif status == "TAKEN":
                                     total_unavailable += 1
                                 elif status == "NOT_ALLOWED":
@@ -1322,10 +1313,10 @@ def run_scanner(bearer_token):
 
                         if res_status:
                             try:
-                                with open(filename, "a") as f:
+                                with open(filename, "a", encoding="utf-8") as f:
                                     f.write(f"{name} [{res_status}]\n")
-                            except IOError:
-                                pass
+                            except Exception as e:
+                                print(f"\n  [!] Failed to save result: {e}")
 
                         update_display()
                         time.sleep(0.5)
@@ -1334,7 +1325,7 @@ def run_scanner(bearer_token):
                 names_since_pause += len(batch_list)
                 if names_since_pause >= 50:
                     scanned = total_available + total_unavailable + total_not_allowed + total_locked + total_unverified
-                    sys.stdout.write(f"\r\x1b[2K  {DIM}Scanned: {scanned} ... cooling down 3s{RESET}")
+                    sys.stdout.write(f"\r  Scanned: {scanned} ... cooling down 3s")
                     sys.stdout.flush()
                     time.sleep(3)
                     update_display()
