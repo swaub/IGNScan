@@ -1,2 +1,4 @@
 requests>=2.28.0
 pysocks>=1.7.1
+selenium>=4.10.0
+webdriver-manager>=4.0.0
