@@ -1122,6 +1122,7 @@ def run_scanner(bearer_token):
     start_time = time.time()
     total_words = len(word_list) if mode in ["dictionary", "common_words"] else 0
     found_names = []
+    last_found = ""
 
     def update_display(final=False):
         scanned = total_available + total_unavailable + total_not_allowed + total_locked + total_unverified
@@ -1153,20 +1154,24 @@ def run_scanner(bearer_token):
         else:
             progress_str = ""
 
+        terminal_width = shutil.get_terminal_size((120, 24)).columns
+
+        found_str = f" | >> {last_found}" if last_found else ""
+
         line = (
             f"  Scanned: {scanned}"
             f" | Avail: {total_available}"
             f" | Taken: {total_unavailable}"
-            f" | Locked: {total_locked}"
-            f" | Blocked: {total_not_allowed}"
-            f" | {elapsed_str} @ {speed:.1f}/min"
-            f" | Rem: {rem_str}"
+            f" | {elapsed_str} @ {speed:.0f}/min"
             f"{progress_str}"
+            f"{found_str}"
         )
-        # Pad with spaces to overwrite any leftover characters
-        terminal_width = shutil.get_terminal_size((120, 24)).columns
-        padded = line.ljust(terminal_width - 1)
-        sys.stdout.write(f"\r{padded}")
+        # Truncate to terminal width to prevent wrapping
+        if len(line) >= terminal_width:
+            line = line[:terminal_width - 1]
+        else:
+            line = line.ljust(terminal_width - 1)
+        sys.stdout.write(f"\r{line}")
         if final:
             sys.stdout.write("\n")
         sys.stdout.flush()
@@ -1264,7 +1269,7 @@ def run_scanner(bearer_token):
                             total_available += 1
                             res_status = "AVAILABLE"
                             found_names.append(name)
-                            print(f"\n  >> FOUND: {name}")
+                            last_found = name
                             if name.lower() in locked_names:
                                 remove_from_locked_list(name, locked_names)
                         elif status == "TAKEN":
