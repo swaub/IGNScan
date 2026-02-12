@@ -6,6 +6,7 @@ auth_cache.bin
 
 # Data
 scans/
+.browser_profile/
 blacklisted_words.txt
 Locked_IGNs.txt
 proxies.txt

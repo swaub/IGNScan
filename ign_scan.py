@@ -294,7 +294,8 @@ def _poll_browser_for_token(driver):
 
 
 def grab_token_from_browser():
-    """Open a browser to Minecraft profile page and intercept the Bearer token."""
+    """Open a browser to Minecraft profile page and intercept the Bearer token.
+    Uses a saved browser profile so the user only needs to sign in once."""
     try:
         from selenium import webdriver
         from selenium.webdriver.chrome.service import Service as ChromeService
@@ -314,10 +315,18 @@ def grab_token_from_browser():
     except ImportError:
         edge_available = False
 
+    # Saved browser profile for persistent login sessions
+    profile_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".browser_profile")
+    first_time = not os.path.exists(profile_dir)
+
     print()
     info("Launching browser...")
-    info("Sign in to Minecraft in the browser window.")
-    info("Your token will be detected automatically.")
+    if first_time:
+        info("Sign in to Minecraft in the browser window.")
+        info("Your session will be saved for future auto-refreshes.")
+    else:
+        info("Using saved session. Token should be grabbed automatically.")
+        info("If prompted, sign in again to refresh your session.")
     info("Press Ctrl+C to cancel.\n")
 
     driver = None
@@ -327,6 +336,7 @@ def grab_token_from_browser():
         options = ChromeOptions()
         options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
         options.add_experimental_option("excludeSwitches", ["enable-logging"])
+        options.add_argument(f"--user-data-dir={profile_dir}")
 
         service = ChromeService(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=options)
@@ -361,11 +371,12 @@ def grab_token_from_browser():
             return None
 
         # Fall back to Edge
-        warn(f"Chrome not available. Trying Microsoft Edge...")
+        warn("Chrome not available. Trying Microsoft Edge...")
 
         try:
             options = EdgeOptions()
             options.set_capability("ms:loggingPrefs", {"performance": "ALL"})
+            options.add_argument(f"--user-data-dir={profile_dir}")
 
             service = EdgeService(EdgeChromiumDriverManager().install())
             driver = webdriver.Edge(service=service, options=options)
